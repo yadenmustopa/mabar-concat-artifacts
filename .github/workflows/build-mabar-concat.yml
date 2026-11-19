@@ -1,0 +1,87 @@
+name: Build and publish Mabar Concat runtime artifacts
+
+on:
+  workflow_dispatch:
+
+permissions:
+  contents: write
+
+jobs:
+  build-native:
+    name: Build native Concat bundles
+    uses: jub0t/Concat/.github/workflows/build-app.yml@main
+    with:
+      ref: main
+    secrets: inherit
+
+  publish-runtime-zips:
+    name: Normalize and publish runtime ZIPs
+    needs: build-native
+    runs-on: ubuntu-24.04
+    permissions:
+      contents: write
+    steps:
+      - name: Download native build artifacts
+        uses: actions/download-artifact@v4
+        with:
+          pattern: Concat-*
+          path: bundles
+          merge-multiple: true
+
+      - name: Install archive tools
+        run: sudo apt-get update && sudo apt-get install -y p7zip-full unzip zip
+
+      - name: Normalize runtime layouts
+        shell: bash
+        run: |
+          set -euo pipefail
+
+          normalize_linux() {
+            local source_pattern="$1"
+            local output_name="$2"
+            local stage
+            stage="$(find bundles -type f -path "*/${source_pattern}/concat" -print -quit | xargs -r dirname)"
+            test -n "$stage" && test -f "$stage/concat" && test -d "$stage/lib"
+            mkdir -p "work/${output_name%.*}"
+            cp "$stage/concat" "work/${output_name%.*}/concat"
+            cp -a "$stage/lib" "work/${output_name%.*}/lib"
+            (cd "work/${output_name%.*}" && zip -r "../../$output_name" .)
+          }
+
+          normalize_macos() {
+            local source_arch="$1"
+            local output_name="$2"
+            local dmg
+            local app
+            dmg="$(find bundles -maxdepth 1 -type f -name "Concat-*-macos-${source_arch}.dmg" -print -quit)"
+            test -n "$dmg"
+            rm -rf "dmg-${source_arch}"
+            7z x -y "$dmg" "-odmg-${source_arch}" >/dev/null
+            app="$(find "dmg-${source_arch}" -type d -name 'Concat.app' -print -quit)"
+            test -n "$app" && test -f "$app/Contents/MacOS/concat"
+            mkdir -p "work/${output_name%.*}/lib"
+            cp "$app/Contents/MacOS/concat" "work/${output_name%.*}/concat"
+            if [ -d "$app/Contents/Frameworks" ]; then
+              cp -a "$app/Contents/Frameworks/." "work/${output_name%.*}/lib/"
+            fi
+            (cd "work/${output_name%.*}" && zip -r "../../$output_name" .)
+          }
+
+          normalize_linux 'Concat-*-linux-x86_64' concat-linux64.zip
+          normalize_linux 'Concat-*-linux-aarch64' concat-linux-arm64.zip
+          normalize_macos arm64 concat-mac-arm64.zip
+          normalize_macos x86_64 concat-mac.zip
+
+          for archive in concat-linux64.zip concat-linux-arm64.zip concat-mac-arm64.zip concat-mac.zip; do
+            unzip -t "$archive" >/dev/null
+            unzip -l "$archive" | grep -E '(^|/)concat($|/)' >/dev/null
+            unzip -l "$archive" | grep -E '(^|/)lib/' >/dev/null
+          done
+          sha256sum concat-*.zip > SHA256SUMS
+          ls -lh concat-*.zip SHA256SUMS
+
+      - name: Upload runtime assets to the public release
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: |
+          gh release upload v0.1.0 concat-linux64.zip concat-linux-arm64.zip concat-mac-arm64.zip concat-mac.zip SHA256SUMS --repo "$GITHUB_REPOSITORY" --clobber
