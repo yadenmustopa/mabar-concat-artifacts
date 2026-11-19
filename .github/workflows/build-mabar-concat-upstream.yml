@@ -981,7 +981,7 @@ jobs:
             foreach ($pe in Get-ChildItem $dir -File -Include *.exe, *.dll -Recurse) {
               foreach ($line in & $dumpbin /nologo /dependents $pe.FullName) {
                 $dll = $line.Trim()
-                $canStage = -not $crtIsSystem32 -or $dll -match "^(concrt140|msvcp140(?:_1|_2|_atomic_wait|_codecvt_ids)?|vccorlib140|vcomp140|vcruntime140(?:_1)?)\.dll$"
+                $canStage = -not $crtIsSystem32
                 if ($dll -match "\.dll$" -and $canStage -and (Test-Path "$($crt.FullName)\$dll") -and -not (Test-Path "$dir\$dll")) {
                   Write-Host "$($pe.Name) imports $dll; copying it from $($crt.FullName)"
                   Copy-Item "$($crt.FullName)\$dll" $dir
