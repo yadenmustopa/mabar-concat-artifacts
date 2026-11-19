@@ -35,11 +35,23 @@ jobs:
         run: |
           set -euo pipefail
 
+          find_linux_stage() {
+            local machine="$1"
+            local candidate
+            while IFS= read -r candidate; do
+              if file -b "$candidate" | grep -Eiq "$machine"; then
+                dirname "$candidate"
+                return 0
+              fi
+            done < <(find bundles -type f -name concat -print)
+            return 1
+          }
+
           normalize_linux() {
-            local source_pattern="$1"
+            local machine="$1"
             local output_name="$2"
             local stage
-            stage="$(find bundles -type f -path "*/${source_pattern}/concat" -print -quit | xargs -r dirname)"
+            stage="$(find_linux_stage "$machine" || true)"
             test -n "$stage" && test -f "$stage/concat" && test -d "$stage/lib"
             mkdir -p "work/${output_name%.*}"
             cp "$stage/concat" "work/${output_name%.*}/concat"
@@ -75,8 +87,8 @@ jobs:
             (cd "work/${output_name%.*}" && zip -r "../../$output_name" .)
           }
 
-          normalize_linux 'Concat-*-linux-x86_64' concat-linux64.zip
-          normalize_linux 'Concat-*-linux-aarch64' concat-linux-arm64.zip
+          normalize_linux 'x86-64' concat-linux64.zip
+          normalize_linux 'aarch64' concat-linux-arm64.zip
           normalize_windows
           normalize_macos arm64 concat-mac-arm64.zip
           normalize_macos x86_64 concat-mac.zip
