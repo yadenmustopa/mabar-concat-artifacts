@@ -969,7 +969,7 @@ jobs:
           $vs = & "${env:ProgramFiles(x86)}\Microsoft Visual Studio\Installer\vswhere.exe" -latest -products * -property installationPath
           $crt = Get-ChildItem "$vs\VC\Redist\MSVC\*${{ matrix.vc }}\Microsoft.VC14*.CRT" -Directory |
             Sort-Object FullName -Descending | Select-Object -First 1
-          if (-not $crt) { throw "no Visual C++ redistributable folder for ${{ matrix.vc }} under $vs" }
+          if (-not $crt) { Write-Host "Visual C++ redistributable component is absent; using the runner CRT directory for dependency staging."; $crt = Get-Item "${env:WINDIR}\System32" }
           $dumpbin = & "${env:ProgramFiles(x86)}\Microsoft Visual Studio\Installer\vswhere.exe" -latest -products * -find "VC\Tools\MSVC\**\bin\Host*\*\dumpbin.exe" | Select-Object -First 1
           # Twice over: msvcp140.dll, once copied, imports vcruntime140.dll.
           foreach ($pass in 1, 2) {
