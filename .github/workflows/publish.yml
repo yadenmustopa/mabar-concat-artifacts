@@ -35,24 +35,17 @@ jobs:
         run: |
           set -euo pipefail
 
-          find_linux_stage() {
-            local machine="$1"
-            local candidate
-            while IFS= read -r candidate; do
-              if file -b "$candidate" | grep -Eiq "$machine"; then
-                dirname "$candidate"
-                return 0
-              fi
-            done < <(find bundles -type f -name concat -print)
-            return 1
-          }
-
           normalize_linux() {
-            local machine="$1"
+            local source_arch="$1"
             local output_name="$2"
+            local deb
             local stage
-            stage="$(find_linux_stage "$machine" || true)"
-            test -n "$stage" && test -f "$stage/concat" && test -d "$stage/lib"
+            deb="$(find bundles -type f -name "Concat-*-linux-${source_arch}.deb" -print -quit)"
+            test -n "$deb"
+            rm -rf "deb-${source_arch}"
+            dpkg-deb -x "$deb" "deb-${source_arch}"
+            stage="deb-${source_arch}/opt/concat"
+            test -f "$stage/concat" && test -d "$stage/lib"
             mkdir -p "work/${output_name%.*}"
             cp "$stage/concat" "work/${output_name%.*}/concat"
             cp -a "$stage/lib" "work/${output_name%.*}/lib"
@@ -87,8 +80,8 @@ jobs:
             (cd "work/${output_name%.*}" && zip -r "../../$output_name" .)
           }
 
-          normalize_linux 'x86-64' concat-linux64.zip
-          normalize_linux 'aarch64' concat-linux-arm64.zip
+          normalize_linux x86_64 concat-linux64.zip
+          normalize_linux aarch64 concat-linux-arm64.zip
           normalize_windows
           normalize_macos arm64 concat-mac-arm64.zip
           normalize_macos x86_64 concat-mac.zip
