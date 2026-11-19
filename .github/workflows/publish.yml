@@ -87,26 +87,10 @@ jobs:
           normalize_macos x86_64 concat-mac.zip
 
           unzip -t concat-win64.zip >/dev/null
-          unzip -Z1 concat-win64.zip | grep -E '(^|/)concat\.exe
-          sha256sum concat-*.zip > SHA256SUMS
-          ls -lh concat-*.zip SHA256SUMS
-
-      - name: Upload runtime assets to the public release
-        env:
-          GH_TOKEN: ${{ github.token }}
-        run: gh release upload v0.1.0 concat-linux64.zip concat-linux-arm64.zip concat-win64.zip concat-mac-arm64.zip concat-mac.zip SHA256SUMS --repo "$GITHUB_REPOSITORY" --clobber
- >/dev/null
+          unzip -Z1 concat-win64.zip | grep -E '(^|/)concat\.exe$' >/dev/null
           for archive in concat-linux64.zip concat-linux-arm64.zip concat-mac-arm64.zip concat-mac.zip; do
             unzip -t "$archive" >/dev/null
-            unzip -Z1 "$archive" | grep -E '(^|/)concat
-          sha256sum concat-*.zip > SHA256SUMS
-          ls -lh concat-*.zip SHA256SUMS
-
-      - name: Upload runtime assets to the public release
-        env:
-          GH_TOKEN: ${{ github.token }}
-        run: gh release upload v0.1.0 concat-linux64.zip concat-linux-arm64.zip concat-win64.zip concat-mac-arm64.zip concat-mac.zip SHA256SUMS --repo "$GITHUB_REPOSITORY" --clobber
- >/dev/null
+            unzip -Z1 "$archive" | grep -E '(^|/)concat$' >/dev/null
             unzip -Z1 "$archive" | grep -E '(^|/)lib/' >/dev/null
           done
           sha256sum concat-*.zip > SHA256SUMS
